@@ -1,71 +1,90 @@
 ---
-title: "Creating simulated data with correlations between them"
+title: "Creating simulated random effects data for two level"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-Want to create simulated longitudinal data that will be used in a multilevel power analysis for the simr package in R.  First I am creating the data for the treatment group, which I am assuming will be weakly correlated positively correlated over time so setting correlation to .1
+Using this website: http://m-clark.github.io/docs/sem/latent-growth-curves.html
 
-Then I am using the mvrnorm package to create the data that is correlated with the settings that I have in the corrDataControl matrix.  I set the means to 7.  
+So creating a data set with 500 total people across 4 time points (ranging from 0 to 3) totaling 2,000 people.  Just creating the numbers for each and generate the actual data later. 
 
-I then use the cor function to reproduce the orginal correlation matrix to check that it is accruately generating the data with the desired underlying correlation. 
+To add a treatment variable, we need to randomly select a set of either 4 0's or 4 1's.  So create a variable that samples from two varibles each with four of one's or zero's and do this 500 times.
+```{r}
+set.seed(1234)
+n = 500
+timepoints = 4
+time = rep(0:3, times=n)
+subject = rep(1:n, each=4)
+treat = c(1,0)
+intervention = sample(treat, replace = TRUE, prob = c(.5, .5), n)
+intervention = rep(intervention, each = 4)
+```
+Then set the intercept and slope that you want.  Then create a matrix to generate the correlation between the intercept and slope to be .2.  This will surve as our sigma for the multivariate normal distribution generation.  
+
+Then we need to generate the data
 ```{r}
 library(MASS)
-library(psych)
-corrDataControl <- matrix(c(1,.1,.1,.1,  .1,1,.1,.1,  .1,.1,1,.1,  .1, .1, .1, 1),4,4)
-corrDataControl
-eigen(corrDataControl) # make sure all eigenvalues are not negative if so see cor.smooth
-set.seed(123)
-dataControl = mvrnorm(100, mu = c(rep(7,4)), Sigma = corrDataControl, empirical = TRUE)
-cor(dataControl)
-```
-Now we do the same thing for the treatment group.  
-```{r}
-corrDataTreatment <- matrix(c(1,.3,.3,.3,  .3,1,.3,.3,  .3,.3,1,.3,  .3, .3, .3, 1),4,4)
-corrDataTreatment
-eigen(corrDataTreatment) # make sure all eigenvalues are not negative if so see cor.smooth
-set.seed(123)
-dataTreatment = mvrnorm(100, mu = c(rep(15,4)), Sigma = corrDataTreatment, empirical = TRUE)
-cor(dataTreatment)
-```
-Now combine the data.  
-```{r}
-dataControl = data.frame(dataControl)
-colnames(dataControl) = c("Time1", "Time2", "Time3", "Time4")
-dataControl$treatment = rep(0, dim(dataControl)[1])
-dataControl
+intercept = .5
+slopeT = .25
+slopeI = .25
+randomEffectsCorr = matrix(c(1,.2,.2, .2, 1,.2, .2, .2, 1), ncol = 3)
+randomEffectsCorr
 
-dataTreatment = data.frame(dataTreatment)
-colnames(dataTreatment) =  c("Time1", "Time2", "Time3", "Time4")
-dataTreatment$treatment = rep(1, dim(dataTreatment)[1])
-dataTreatment
+randomEffects = mvrnonnorm(2000, mu = c(0,0,0), Sigma = randomEffectsCorr, empirical = TRUE)
+randomEffects = data.frame(randomEffects)
+colnames(randomEffects) = c("Int", "SlopeT", "SlopeI")
+```
+Now we need to create the indiviudal variables.  This means adding the intercept and the slope, but not sure why we just aren't adding the intercept 
+randomEffects$Int[subject] = must be the intercept for each person
+randomEffects$Slope[subject] = must be the slope for each person.
 
-dataPower = rbind(dataTreatment, dataControl)
-head(dataPower)
-```
-Now get the data into long format.  
+So we want to add the intercept and slope to person estimate from the multivaraite estimation, plus an error, because that is the model for predicting y.  Sigma is the error term, which is draw from a normal distribution.
+
+So I think we need to assume the data is standardized for this example.
+Adding the [subject] says for each subject give them the same number.
 ```{r}
-library(reshape)
-dataPower = reshape(dataPower, varying = list(c("Time1", "Time2", "Time3", "Time4")), times = c(1,2,3,4), direction = "long")
-colnames(dataPower) = c("Treatment", "Time", "Outcome", "ID")
-dataPower
+sigma = .5
+y1 = (intercept + randomEffects$Int[subject])+(slope + randomEffects$SlopeT[subject])*time + randomEffects$SlopeT[subject]*intervention + rnorm(n*timepoints, mean = 0, sd = sigma)
+d = data.frame(subject, time, y1)
+d
 ```
-Now we want to analyze the data in lme4 with simpower.  I am setting the fixef for the parameter estimate of interest the interaction between time and treatment to 1 and saying to increase the sample along ID, which mean increase the number of people per time point.  I am only running 4 times, because it take awhile. 
+Generate the data the + 1 doesn't change the results.
+```{r}
+library(lme4)
+model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
+summary(model1)
+```
+Let's add a variable first.  So we want to add a binary variable.  I think we need to create the variable.  So each subject needs to be in the same group though.  
+
+Trying to understand what the level three model looks like
 ```{r}
 library(simr)
-model1 = lmer(Outcome ~ Time*Treatment + (Time | ID), data = dataPower)
+set.seed(12345)
+datCon = data.frame(id = rep(1:40, each = 30), cluster = rep(rep(1:5, each = 6), 40),time = rep(1:6, 200))
+colnames(datCon) = c("id", "cluster", "time")
+dim(datCon)
+treatment = ifelse(datCon$cluster < 4, 1, 0)
+datCon$treatment = treatment
+### Get the dim for for each
+datTreat = subset(datCon, cluster < 4)
+dim(datTreat)
+
+# For six time points go up by 2 points each time point
+datControl = subset(datCon, cluster > 3)
+dim(datControl)
+## Now create the outcomes
+outcomeTreat = rbind(rnorm(720/6, 50-10, 5), rnorm(720/6, 50-8, 5), rnorm(720/6, 50-6, 5), rnorm(720/6, 50-4, 5), rnorm(720/6, 50-2, 5), rnorm(720/6, 50, 5))
+
+outcomeControl = rbind(rnorm(720/6, 30, 5), rnorm(720/6, 30, 5), rnorm(720/6, 30, 5), rnorm(720/6, 30, 5), rnorm(720/6, 30, 5), rnorm(720/6, 30, 5))
+
+### Now put them into new variable called outcome
+datCon$outcome = ifelse(datCon$cluster < 4, outcomeTreat, outcomeControl)
+datCon
+
+library(lme4)
+model1 = lmer(outcome ~ time*treatment + (time | cluster/id), data = datCon)
 summary(model1)
-
-fixef(model1)["Time:Treatment"] = 1
-powerCurve(model1, test = fixed("Time:Treatment"),  along = "ID", nsim = 4)
-
-```
-Now try with binary outcomes
-```{r}
-install.packages("evd")
-install.packages("SimCorMultRes")
-library(SimCorMultRes)
 ```
 
