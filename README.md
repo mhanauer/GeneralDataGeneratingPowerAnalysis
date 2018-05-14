@@ -11,6 +11,7 @@ Here is the model that I am trying to recreate
 Level 1: There is the intercept that varies for each person over time.  Then there is the slope for time that varies for each person over time.  Finally there is the error term that is unique for each data point.
 
 $$ Level~1:~~~{y_{ij} = \beta_{0j} + \beta_{1j}Time_{ij} + e_{ij}}~~~ (1.1)$$
+
 Level 2 Intercept: Here the intercept is broken down into the constant plus the effect of the intervention, which is at level 2 in the intercept because it does not vary over time only by person and the error term which varies by person. 
 
 $$ Level~2~Intercept:~~~{\beta_{0j} = \gamma_{00} + \gamma_{01}Intervention_{j} + u_{0j}} ~~~ (1.2)$$
@@ -18,10 +19,8 @@ $$ Level~2~Intercept:~~~{\beta_{0j} = \gamma_{00} + \gamma_{01}Intervention_{j} 
 Then there is level the two slope which has the constant effect, plus the slope for the intervention for each person, plus a random error term that unique to each person.  
 
 $$ Level~2~Slope~Time:~~~{\beta_{1j} = \gamma_{10} + \gamma_{11}Intervention_{j} + u_{1j}} ~~~ (1.3)$$
-
 Then we have the mixed model, which has all the components combined
-
-$$Mixed~model: ~~~{y_{ij} =  (\gamma_{10}+ \gamma_{10}Time_{ij} + +u_{1j}Time_{ij}) + (\gamma_{00}+ \gamma_{01}Intervention_{j} + u_{0j}) +  \gamma_{11}Time_{ij}Intervention_{j} + e_{ij}} ~~~(1.4)$$
+$$Mixed~model: ~~~{y_{ij} =   (\gamma_{00}+ \gamma_{01}Intervention_{j} + u_{0j}) + (\gamma_{10}}+\gamma_{11}*Intervention_{j} +u_{1j})*Time_{ij} + e_{ij} $$
 I am basing this example on the example below and extending it by adding an intervention variable: http://m-clark.github.io/docs/sem/latent-growth-curves.html
 
 I am creating a data set with 500 total people across 4-time points (ranging from 0 to 3) totaling 2,000 data points.  
@@ -140,9 +139,11 @@ summary(model1)
 ```
 Here is the model for the level three with clustering added
 $$ Level~1:~~~{y_{ijk} = \beta_{0jk} + \beta_{1jk}Time_{ijk} + e_{ijk}}~~~ (1.1)$$
+
 $$ Level~2~Intercept:~~~{\beta_{0jk} = \gamma_{00k} + u_{0jk}} ~~~ (1.2)$$
+
 $$ Level~2~Slope:~~~{\beta_{1jk} = \gamma_{10k} + u_{1jk}} ~~~ (1.3)$$
-$$ Level~3~Intercept:~~~{\beta_{00k} = \gamma_{000} +  \gamma_{001}Intervention_{k}+ u_{00k}} ~~~ (1.4)$$
-$$ Level~3~Slope:~~~{\beta_{10k} = \gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{10k}} ~~~ (1.4)$$
 
-
+$$ Level~3~Intercept:~~~{\gamma_{00k} = \gamma_{000} +  \gamma_{001}Intervention_{k}+ u_{00k}} ~~~ (1.4)$$
+$$ Level~3~Slope:~~~{\gamma_{10k} = \gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{10k}} ~~~ (1.5)$$
+$$  Mixed Model:~~ {(\gamma_{000}+ \gamma_{001}Intervention_{k}+ u_{00k}+u_{0jk})+ (\gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{10k} + u_{1jk})*Time_{ijk}+e_{ijk}}~~(1.6)$$
