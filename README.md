@@ -28,9 +28,10 @@ I then create the number of subjects, which are 500 people replicated four times
 
 To add an intervention I create a treat variable which I then sample from 500 times and then replicate these values 4 times.
 ```{r}
-n = 500
-timepoints = 4
-time = rep(0:3, times=n)
+n = 200
+timepoints = 6
+time = timepoints-1
+time = rep(0:time, times=n)
 subject = rep(1:n, each=timepoints)
 treat = c(1,0)
 intervention = sample(treat, replace = TRUE, prob = c(.5, .5), n)
@@ -45,7 +46,6 @@ Then I am creating the random effects for the intercept and time, because each p
 I am also creating a slope for the interaction effect between time and intervention, which is also .25
 ```{r}
 library(MASS)
-n = 500
 intercept = .5
 slopeT = .25
 slopeI = .25
@@ -57,6 +57,7 @@ randomEffects = mvrnonnorm(n, mu = c(0,0), Sigma = randomEffectsCorr, empirical 
 randomEffects = data.frame(randomEffects)
 dim(randomEffects)
 colnames(randomEffects) = c("Int", "SlopeT")
+dim(randomEffects)
 ```
 Now I am trying to create the outcome variable that has the parameters above.  I am creating random effects for the intercept and slope across time because each person will get their own random effect over this variable, because it is nested within people.  Then I am creating the fixed effects, which are constant across the people according the variable.  For example, the slope for the intervention only varies across the whether someone get the intervention or not. 
 
@@ -65,7 +66,7 @@ Ok so when you have [subject] that just means that each subject gets the same va
 sigma = .05
 y1 = (intercept + randomEffects$Int[subject])+(slopeT + randomEffects$SlopeT[subject])*time + slopeI*intervention + slopeTI*time*intervention+ rnorm(n*timepoints, mean = 0, sd = sigma)
 d = data.frame(subject, time, intervention, y1)
-d
+dim(d)
 ```
 Generate the data using the model that has the intervention effect that I want with time nested within participants.
 ```{r}
@@ -97,10 +98,6 @@ ggplot_qqnorm(resid2_model2$time, line = "rlm")
 cooks_model2 = cooks.distance(model2, group = "subject")
 dotplot_diag(x = cooks_model2, cutoff = "internal", name = "cooks.distance")
 ```
-
-
-
-
 Ok now let us run it in the simr.  Models two and three run fine.  Problem seems to be when we add multiple covariates I can only run the function with the first covariate entered and cannot seem to change it.
 
 If I only have the interaction term, it won't run.  
@@ -108,7 +105,7 @@ If I only have the interaction term, it won't run.
 library(simr)
 model6 = lmer(y1 ~ time + intervention + time*intervention + (time | subject), data = d)
 summary(model6)
-fixef(model6)["time:intervention"] = .5
+fixef(model6)["time:intervention"] = .25
 set.seed(1234)
 powerCurve(model6, along = "subject", nsim = 10, test = fixed("time:intervention"))
 ```
