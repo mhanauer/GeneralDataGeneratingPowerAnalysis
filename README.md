@@ -74,6 +74,8 @@ library(lme4)
 model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
 summary(model1)
 ```
+
+
 Diagnostics for level one.  Look at the plot of residuals against actual values hopefully no patterns, then look at qqplot.  Will help with normailty assumption of residuals and heterskedasticity.
 ```{r}
 library(HLMdiag)
@@ -81,6 +83,9 @@ library(ggplot2)
 model1 = lmer(y1 ~ time*intervention + (1|subject), data = d)
 resid1_model1 = HLMresid(model1, level = 1, type = "LS", standardize = TRUE)
 head(resid1_model1)
+
+#Psuedo r^2 see Peugh(2010)
+r2 = cor(resid1_model1$y1, resid1_model1$fitted)^2; r2
 
 qplot(x = resid1_model1$y1, y = resid1_model1$LS.resid, data = resid1_model1, geom = c("point", "smooth"))
 
