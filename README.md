@@ -12,15 +12,20 @@ Level 1: There is the intercept that varies for each person over time.  Then the
 
 $$ Level~1:~~~{y_{ij} = \beta_{0j} + \beta_{1j}Time_{ij} + e_{ij}}~~~ (1.1)$$
 
+
 Level 2 Intercept: Here the intercept is broken down into the constant plus the effect of the intervention, which is at level 2 in the intercept because it does not vary over time only by person and the error term which varies by person. 
 
 $$ Level~2~Intercept:~~~{\beta_{0j} = \gamma_{00} + \gamma_{01}Intervention_{j} + u_{0j}} ~~~ (1.2)$$
 
+
 Then there is level the two slope which has the constant effect, plus the slope for the intervention for each person, plus a random error term that unique to each person.  
 
 $$ Level~2~Slope~Time:~~~{\beta_{1j} = \gamma_{10} + \gamma_{11}Intervention_{j} + u_{1j}} ~~~ (1.3)$$
+
 Then we have the mixed model, which has all the components combined
 $$Mixed~model: ~~~{y_{ij} =   (\gamma_{00}+ \gamma_{01}Intervention_{j} + u_{0j}) + (\gamma_{10}}+\gamma_{11}*Intervention_{j} +u_{1j})*Time_{ij} + e_{ij} $$
+
+
 I am basing this example on the example below and extending it by adding an intervention variable: http://m-clark.github.io/docs/sem/latent-growth-curves.html
 
 I am creating a data set with 500 total people across 4-time points (ranging from 0 to 3) totaling 2,000 data points.  
@@ -115,10 +120,6 @@ set.seed(1234)
 powerCurve(model6, along = "subject", nsim = 10, test = fixed("time:intervention"))
 ```
 
-
-
-
-
 So how many clusters for 500 people so 50 people per cluster.  Need to include n in this somehow.  Cluster will be an each thing.  So the each for cluster needs to be divisable by the each for the subject.
 
 Here the random assignment is at the cluster level.
@@ -144,10 +145,10 @@ dat = data.frame(time, subject, cluster, intervention)
 Now I am creating the random effects, which I believe that I have two set of one for time and the other subjects.  The same process as above for creating these.  There should be 1,000 random effects for time, because each person gets their own random intercept and slope.  Since there are 10 random effects then there needs to be 10 different random effects one for each cluster. 
 ```{r}
 n = 1000
-interceptT = .5
+interceptT = 0
 slopeT = .25
 slopeTI = .25
-randomEffectsCorrT = matrix(c(1,.2,.2, 1), ncol = 2)
+randomEffectsCorrT = matrix(c(.5,.2,.2, .5), ncol = 2)
 randomEffectsCorrT
 
 randomEffectsT = mvrnonnorm(n = n, mu = c(0,0), Sigma = randomEffectsCorrT, empirical = TRUE)
@@ -156,9 +157,9 @@ colnames(randomEffectsT) = c("IntT", "SlopeT")
 dim(randomEffectsT)
 
 clusterPoints  = 10
-interceptP = .5
+interceptP = 0
 slopeP = .25
-randomEffectsCorrP = matrix(c(1,.2,.2, 1), ncol = 2)
+randomEffectsCorrP = matrix(c(.5,.2,.2, .5), ncol = 2)
 randomEffectsCorrP
 
 randomEffectsP = mvrnonnorm(n = 10, mu = c(0,0), Sigma = randomEffectsCorrP, empirical = TRUE)
@@ -175,12 +176,15 @@ I am stuck because I think I understand why we have randomEffectsT$SlopeT[subjec
 If we follow the same logic, then there needs to be a random slope component for the subject, because people are nested in clusters and each cluster is allowed to have its own intercept and slope over the people in the cluster.  By multiplying the randomEffectsP$SlopeP[cluster]) by subject doesn’t have any meaning, because differences between subjects are meaningless, unlike time.  So the random effects are arbitrarily enlarged as the subject number gets larger.  
 
 $$  Mixed Model:~~ {(\gamma_{000}+ \gamma_{001}Intervention_{k}+u_{0jk} +u_{00k})+ (\gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{1jk} + u_{10k})*Time_{ijk}+e_{ijk}}~~(1.6)$$
+
 ```{r}
 sigma = .1
 y1 = (interceptT + randomEffectsP$IntP[cluster] +randomEffectsT$Int[subject])+(slopeT + randomEffectsP$SlopeP[cluster] + randomEffectsT$SlopeT[subject])*time + slopeI*intervention + slopeTI*intervention*time + rnorm(n*timepoints, mean = 0, sd = sigma)
 d = data.frame(subject, time, cluster, intervention, y1)
 d = round(d, 2)
-d
+head(d)
+head(randomEffectsP$IntP[cluster])
+
 ```
 So now we put together the model and see if we can recover the parameters.
 ```{r}
@@ -191,11 +195,13 @@ summary(model1)
 Here is the model for the level three with clustering added
 $$ Level~1:~~~{y_{ijk} = \beta_{0jk} + \beta_{1jk}Time_{ijk} + e_{ijk}}~~~ (1.1)$$
 
-$$ Level~2~Intercept:~~~{\beta_{0jk} = \gamma_{00k} + u_{0jk}} ~~~ (1.2)$$
 
+$$ Level~2~Intercept:~~~{\beta_{0jk} = \gamma_{00k} + u_{0jk}} ~~~ (1.2)$$
 $$ Level~2~Slope:~~~{\beta_{1jk} = \gamma_{10k} + u_{1jk}} ~~~ (1.3)$$
 
 $$ Level~3~Intercept:~~~{\gamma_{00k} = \gamma_{000} +  \gamma_{001}Intervention_{k}+ u_{00k}} ~~~ (1.4)$$
+
 $$ Level~3~Slope:~~~{\gamma_{10k} = \gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{10k}} ~~~ (1.5)$$
+
 $$  Mixed Model:~~ {(\gamma_{000}+ \gamma_{001}Intervention_{k}+u_{0jk} +u_{00k})+ (\gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{1jk} + u_{10k})*Time_{ijk}+e_{ijk}}~~(1.6)$$
 The trick is to take the final intercepts and slope recreate them and multiple the slopes by the level one variables and add the error terms for level two.
