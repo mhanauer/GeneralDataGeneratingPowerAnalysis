@@ -33,14 +33,7 @@ I then create the number of subjects, which are 500 people replicated four times
 
 To add an intervention I create a treat variable which I then sample from 500 times and then replicate these values 4 times.
 ```{r}
-n = 200
-timepoints = 6
-time = timepoints-1
-time = rep(0:time, times=n)
-subject = rep(1:n, each=timepoints)
-treat = c(1,0)
-intervention = sample(treat, replace = TRUE, prob = c(.5, .5), n)
-intervention = rep(intervention, each = timepoints)
+
 ```
 I am assuming I have an outcome that is normally distributed and in standard normal form.     
 
@@ -51,7 +44,16 @@ Then I am creating the random effects for the intercept and time, because each p
 I am also creating a slope for the interaction effect between time and intervention, which is also .25
 ```{r}
 library(MASS)
-intercept = .5
+power_matt_two = function(){
+n = 200
+timepoints = 6
+time = timepoints-1
+time = rep(0:time, times=n)
+subject = rep(1:n, each=timepoints)
+treat = c(1,0)
+intervention = sample(treat, replace = TRUE, prob = c(.5, .5), n)
+intervention = rep(intervention, each = timepoints)
+  intercept = .5
 slopeT = .25
 slopeI = .25
 slopeTI = .25
@@ -63,21 +65,36 @@ randomEffects = data.frame(randomEffects)
 dim(randomEffects)
 colnames(randomEffects) = c("Int", "SlopeT")
 dim(randomEffects)
+sigma = .05
+y1 = (intercept + randomEffects$Int[subject])+(slopeT + randomEffects$SlopeT[subject])*time + slopeI*intervention + slopeTI*time*intervention+ rnorm(n*timepoints, mean = 0, sd = sigma)
+d = data.frame(subject, time, intervention, y1)
+model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
+model1_summary = summary(model1)
+model1_summary$coefficients[,1]
+}
+
 ```
+Try getting the effects and make sure they are being replicated
+```{r}
+rep = 50
+power_rep = replicate(reps, power_matt_two())
+power_rep_df = data.frame(power_rep)
+power_rep_df_mean = rowMeans(power_rep_df)
+power_rep_df_mean
+
+```
+
+
 Now I am trying to create the outcome variable that has the parameters above.  I am creating random effects for the intercept and slope across time because each person will get their own random effect over this variable, because it is nested within people.  Then I am creating the fixed effects, which are constant across the people according the variable.  For example, the slope for the intervention only varies across the whether someone get the intervention or not. 
 
 Ok so when you have [subject] that just means that each subject gets the same value.  Then it makes sense, because you want the random effects for the person to be the same and then vary by time for the slope, because we want this estimate to vary over time instead of just the same data point for each person.
 ```{r}
-sigma = .05
-y1 = (intercept + randomEffects$Int[subject])+(slopeT + randomEffects$SlopeT[subject])*time + slopeI*intervention + slopeTI*time*intervention+ rnorm(n*timepoints, mean = 0, sd = sigma)
-d = data.frame(subject, time, intervention, y1)
-dim(d)
+
 ```
 Generate the data using the model that has the intervention effect that I want with time nested within participants.
 ```{r}
 library(lme4)
-model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
-summary(model1)
+
 ```
 
 
@@ -202,25 +219,26 @@ $$ Level~3~Slope:~~~{\gamma_{10k} = \gamma_{100} +  \gamma_{101}Intervention_{k}
 $$  Mixed Model:~~ {(\gamma_{000}+ \gamma_{001}Intervention_{k}+u_{0jk} +u_{00k})+ (\gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{1jk} + u_{10k})*Time_{ijk}+e_{ijk}}~~(1.6)$$
 The trick is to take the final intercepts and slope recreate them and multiple the slopes by the level one variables and add the error terms for level two.
 
-Loop for three level
+Loop for three level: This is correct
 ```{r}
-n = 500
+library(semTools)
+power_matt = function(){
+n = 1000
 clusterPoints = 20 
 timepoints = 4
 nCluster = (n*timepoints)/clusterPoints
 time = rep(0:3, times=n)
-subject = rep(1:n, each=4)
+subject = rep(1:n, each=timepoints)
 cluster = rep(1:clusterPoints, each = nCluster) 
 treat = c(1,0)
-set.seed(1211)
 intervention = sample(treat, replace = TRUE, prob = c(.5, .5), clusterPoints)
 intervention = rep(intervention, each = nCluster)
 dat = data.frame(time, subject, cluster, intervention)
 
 interceptT = 0
 slopeT = .25
-slopeTI = .25
-randomEffectsCorrT = matrix(c(.3,.2,.2, .3), ncol = 2)
+slopeTI = 20
+randomEffectsCorrT = matrix(c(.2,.2,.2, .2), ncol = 2)
 randomEffectsCorrT
 
 randomEffectsT = mvrnonnorm(n = n, mu = c(0,0), Sigma = randomEffectsCorrT, empirical = TRUE)
@@ -230,8 +248,8 @@ dim(randomEffectsT)
 
 clusterPoints  = 10
 interceptP = 0
-slopeP = .1
-randomEffectsCorrP = matrix(c(.3,.2,.2, .3), ncol = 2)
+slopeP = .25
+randomEffectsCorrP = matrix(c(.2,.2,.2,.2), ncol = 2)
 randomEffectsCorrP
 
 randomEffectsP = mvrnonnorm(n = clusterPoints, mu = c(0,0), Sigma = randomEffectsCorrP, empirical = TRUE)
@@ -244,10 +262,21 @@ y1 = (interceptT + randomEffectsP$IntP[cluster] +randomEffectsT$Int[subject])+(s
 d = data.frame(subject, time, cluster, intervention, y1)
 d = round(d, 2)
 
-model1 = lmer(y1 ~ time*intervention + (1 | cluster/subject), data = d)
+model1 = lmer(y1 ~ time*intervention + (1 | cluster / subject), data = d)
 model1_summary = summary(model1)
-model1_summary$coefficients
 
+}
+```
+
+
+
+Now replicate it
+```{r}
+reps = 50
+power_rep = replicate(reps, power_matt())
+power_rep_df = data.frame(power_rep)
+power_rep_df_mean = rowMeans(power_rep_df)
+power_rep_df_mean
 ```
 
 
