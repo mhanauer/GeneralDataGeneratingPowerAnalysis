@@ -148,7 +148,7 @@ n = 1000
 interceptT = 0
 slopeT = .25
 slopeTI = .25
-randomEffectsCorrT = matrix(c(.5,.2,.2, .5), ncol = 2)
+randomEffectsCorrT = matrix(c(.3,.2,.2, .3), ncol = 2)
 randomEffectsCorrT
 
 randomEffectsT = mvrnonnorm(n = n, mu = c(0,0), Sigma = randomEffectsCorrT, empirical = TRUE)
@@ -159,7 +159,7 @@ dim(randomEffectsT)
 clusterPoints  = 10
 interceptP = 0
 slopeP = .25
-randomEffectsCorrP = matrix(c(.5,.2,.2, .5), ncol = 2)
+randomEffectsCorrP = matrix(c(.3,.2,.2, .3), ncol = 2)
 randomEffectsCorrP
 
 randomEffectsP = mvrnonnorm(n = 10, mu = c(0,0), Sigma = randomEffectsCorrP, empirical = TRUE)
@@ -178,7 +178,7 @@ If we follow the same logic, then there needs to be a random slope component for
 $$  Mixed Model:~~ {(\gamma_{000}+ \gamma_{001}Intervention_{k}+u_{0jk} +u_{00k})+ (\gamma_{100} +  \gamma_{101}Intervention_{k}+ u_{1jk} + u_{10k})*Time_{ijk}+e_{ijk}}~~(1.6)$$
 
 ```{r}
-sigma = .1
+sigma = .05
 y1 = (interceptT + randomEffectsP$IntP[cluster] +randomEffectsT$Int[subject])+(slopeT + randomEffectsP$SlopeP[cluster] + randomEffectsT$SlopeT[subject])*time + slopeI*intervention + slopeTI*intervention*time + rnorm(n*timepoints, mean = 0, sd = sigma)
 d = data.frame(subject, time, cluster, intervention, y1)
 d = round(d, 2)
@@ -189,7 +189,7 @@ head(randomEffectsP$IntP[cluster])
 So now we put together the model and see if we can recover the parameters.
 ```{r}
 library(lme4)
-model1 = lmer(y1 ~ time*intervention + (time | cluster/subject), data = d)
+model1 = lmer(y1 ~ time*intervention + (1 | cluster/subject), data = d)
 summary(model1)
 ```
 Here is the model for the level three with clustering added
