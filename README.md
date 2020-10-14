@@ -27,13 +27,13 @@ $$Mixed~model: ~~~{y_{ij} =   (\gamma_{00}+ \gamma_{01}Intervention_{j} + u_{0j}
 
 Library packages 
 ```{r}
-library(HLMdiag)
 library(ggplot2)
 library(lme4)
 #library(lmtest)
 library(sjstats)
-library(MASS)
+install.packages("semTools")
 library(semTools)
+library(MASS)
 library(MuMIn)
 ```
 
@@ -63,9 +63,9 @@ treat = c(1,0)
 intervention = sample(treat, replace = TRUE, prob = c(.5, .5), n)
 intervention = rep(intervention, each = timepoints)
   intercept = .5
-slopeT = .25
-slopeI = .25
-slopeTI = .25
+slopeT = .5
+slopeI = .5
+slopeTI = 1
 randomEffectsCorr = matrix(c(1,.2,.2, 1), ncol = 2)
 randomEffectsCorr
 
@@ -76,7 +76,8 @@ colnames(randomEffects) = c("Int", "SlopeT")
 dim(randomEffects)
 sigma = .05
 y1 = (intercept + randomEffects$Int[subject])+(slopeT + randomEffects$SlopeT[subject])*time + slopeI*intervention + slopeTI*time*intervention+ rnorm(n*timepoints, mean = 0, sd = sigma)
-d = data.frame(subject, time, intervention, y1)
+## Scale dependent variable or take the log for percentage
+d = data.frame(subject, time, intervention, y1 = scale(y1))
 model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
 model1_summary = summary(model1)
 model1_summary$coefficients[,1]
@@ -87,7 +88,7 @@ Try getting the effects and make sure they are being replicated
 
 ```{r}
 rep = 50
-power_rep = replicate(reps, power_matt_two())
+power_rep = replicate(rep, power_matt_two())
 power_rep_df = data.frame(power_rep)
 power_rep_df_mean = rowMeans(power_rep_df)
 power_rep_df_mean
