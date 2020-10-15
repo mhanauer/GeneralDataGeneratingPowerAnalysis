@@ -42,7 +42,7 @@ Two level two treatment to make sure replication of effect
 Then identifying what levels of the variable produce an effect size using Kane (2016) of dividing the baseline sd by the effect for the treatment by time fixed effects
 
 ```{r}
-power_matt_two = function(){
+
 n = 150
 timepoints = 5
 time = timepoints-1
@@ -70,13 +70,7 @@ d = data.frame(subject, time, intervention, y1 = y1)
 model1 = lmer(y1 ~ time*intervention + (1|subject), data = d)
 model1_summary = summary(model1)
 model1_summary$coefficients[,1]
-### Grab the pooled standard deviation from the baseline consistent with Niv(2007)
-pooled_sd = subset(d, time == 0)
-pooled_sd = sd(d$y1)
-cohen_d_time_inter =  model1_summary$coefficients[,1] /pooled_sd 
-cohen_d_time_inter= cohen_d_time_inter[4]
-return(cohen_d_time_inter)
-}
+
 ```
 Try getting the effects and make sure they are being replicated
 
@@ -90,7 +84,7 @@ power_rep_df_mean
 ```
 Now do a loop for different n's and different parameters
 ```{r}
-power_matt_two = function(){
+# Create function
 ### All empty lists need to be outside the loop 
 cohen_d_time_inter = list()
 ### Create empty data sets
@@ -101,18 +95,26 @@ slopeTI = list()
 randomEffects = list()
 y1 = list()
 subject = list()
+d = list()
+model_out = list()
+model1_summary = list()
+eff = list()
+sd_base_pooled = list()
+cohen_d_ti = list()
 n_sample = rep(c(seq(from = 200, to = 500, by =50)), each =5)
-rep_eff = as.list(rep(c(3,4,5,6,7), length(n_sample) / 5))
+### This is the number of times to rep for the full simluation
+n_rep = 10
+n_sample = rep(n_sample, n_rep)
+rep_eff = as.list(rep(c(2,3,4,5,6), length(n_sample) / 5))
 for(i in 1:length(n_sample)){
 #### Data generate
 timepoints = 5
 timepoints = timepoints-1
-time[[i]] = n_sample[[i]]
 time[[i]] = rep(0:timepoints, times=n_sample[[i]])
-subject[[i]] = rep(1:n_sample[[i]], each=timepoints)
+subject[[i]] = rep(1:n_sample[[i]], each=timepoints+1)
 treat = c(1,0)
 intervention[[i]] = sample(treat, replace = TRUE, prob = c(.5, .5), n_sample[[i]])
-intervention[[i]] = rep(intervention[[i]], each = timepoints)
+intervention[[i]] = rep(intervention[[i]], each = timepoints+1)
 intercept = 20
 slopeT = 7
 slopeI = 7
@@ -121,23 +123,45 @@ randomEffectsCorr = matrix(c(.2), ncol = 1)
 randomEffects[[i]] = mvrnonnorm(n_sample[[i]], mu = c(0), Sigma = randomEffectsCorr, empirical = TRUE)
 randomEffects[[i]] = data.frame(randomEffects[[i]])
 colnames(randomEffects[[i]]) = c("Int")
-sigma = .2
-### Rep the random effects so there is one unique random intercept
-randomEffects[[i]] = rep(randomEffects[[i]]$Int, each = timepoints)
-y1[[i]] = (intercept + randomEffects[[i]])+(slopeT*time[[i]] + slopeI*intervention[[i]] + slopeTI[[i]]*time[[i]]*intervention[[i]])+ rnorm(n_sample[[i]]*timepoints, mean = 0, sd = sigma)
+sigma = 40
+### Rep the random effects so there is one unique random intercept need +1 because you subtracted one from timepoints
+randomEffects[[i]] = rep(randomEffects[[i]]$Int, each = timepoints+1)
+y1[[i]] = (intercept + randomEffects[[i]])+(slopeT*time[[i]] + slopeI*intervention[[i]] + slopeTI[[i]]*time[[i]]*intervention[[i]])+ rnorm(length(randomEffects[[i]]), mean = 0, sd = sigma)
+d[[i]] = data.frame(subject[[i]], time[[i]], intervention[[i]], y1[[i]])
+model_out[[i]] = lmer(y1[[i]] ~ time[[i]]*intervention[[i]] + (1 |subject[[i]]), data = d[[i]])
+model1_summary[[i]] = summary(model_out[[i]])
+### Need to grab p-values
+p_value[[i]] =  ifelse(model1_summary[[i]]$coefficients[4,5] < .05, 1, 0)
+### Divide by pooled baseline sd
+eff[[i]] = model1_summary[[i]]$coefficients[4,1] 
+sd_base_pooled[[i]] = subset(d[[i]], time..i.. == 0)
+sd_base_pooled[[i]] = sd(d[[i]]$y1..i..)
+cohen_d_ti[[i]] = eff[[i]] / sd_base_pooled[[i]]
 }
-length(randomEffects[[1]])
-length(time[1])
-## Scale dependent variable or take the log for percentage
-d = data.frame(subject, time, intervention, y1 = scale(y1))
-model1 = lmer(y1 ~ time*intervention + (time|subject), data = d)
-model1_summary = summary(model1)
-model1_summary$coefficients[4,5]
+```
+Run the function 10 times
+```{r}
+p_value_results = unlist(p_value)
+n_sample_results = unlist(n_sample)
+rep_eff_results = unlist(rep_eff)
+cohen_d_ti_results = unlist(cohen_d_ti)
+data_results = round(data.frame(n = n_sample_results, effect_size =  rep_eff_results, p_value_results, cohen_d_ti_results),2)
+library(dplyr)
+data_power =  data_results %>%
+  group_by(n, effect_size) %>%
+  summarise(power = sum(p_value_results)/n_rep, cohen_d = mean(cohen_d_ti_results))
+data_power
+write.csv(data_power, "data_power.csv", row.names = FALSE)
+```
+Now plot the results
+```{r}
+library(ggplot2)
+data_power %>%
+  ggplot( aes(x=n_sample_results, y=power, color = rep_eff_results)) +
+    geom_line()+
+    geom_hline(yintercept=.8, linetype="dashed", color = "red")+
+  ggtitle("Figure 1: SEASA power analysis")
 
-}
-test = randomEffects[[1]]
-test[subject]
-randomEffects[[1]] [subject]
 ```
 
 
